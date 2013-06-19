@@ -44,7 +44,7 @@ $billing_state = 'Illinois';
 $billing_city = 'Oak Brook';
 $billing_zip = '60523';
 $billing_address_1 = '2796 Steele Street';
-$billing_address_2 = '';
+$billing_address_2 = '1st Flat';
 $billing_phone = '630-634-1799';
 $billing_email = 'vladimir.barbarosh@gmail.com';
 
@@ -58,11 +58,11 @@ $shipping_state = 'Minnesota';
 $shipping_city = 'Baudette';
 $shipping_zip = '56623';
 $shipping_address_1 = '1028 Terra Cotta Street';
-$shipping_address_2 = '';
+$shipping_address_2 = '2nd Flat';
 $shipping_phone = '218-634-5672';
 $shipping_email = 'vladimir.barbarosh@gmail.com';
 
-# HTML Variables for PayPal Payments Standard 
+# HTML Variables for PayPal Payments Standard
 # https://developer.paypal.com/webapps/developer/docs/classic/paypal-payments-standard/integration-guide/Appx_websitestandard_htmlvariables/
 $param = array();
 $param['business'] = $config['business'];
@@ -76,7 +76,7 @@ if ($shipping) {
 	$param['shipping'] = $shipping_amount;
 }
 
-# HTML Variables for Payment Transactions 
+# HTML Variables for Payment Transactions
 # https://developer.paypal.com/webapps/developer/docs/classic/paypal-payments-standard/integration-guide/Appx_websitestandard_htmlvariables/#id08A6HH00W2J
 $param['invoice'] = $order_id;
 $param['currency_code'] = $order_currency;
@@ -95,7 +95,7 @@ if (!$shipping) {
 # https://developer.paypal.com/webapps/developer/docs/classic/paypal-payments-standard/integration-guide/Appx_websitestandard_htmlvariables/#id08A6HI0709B
 $param['return'] = dirname(script_url()).'/standard_pdt_on_confirm.php';
 $param['cancel_return'] = dirname(script_url()).'/standard_pdt_on_cancel.php';
-# HTML Variables for PayPal Payments Standard 
+# HTML Variables for PayPal Payments Standard
 # https://developer.paypal.com/webapps/developer/docs/classic/paypal-payments-standard/integration-guide/Appx_websitestandard_htmlvariables/
 $param['notify_url'] = dirname(script_url()).'/standard_ipn.php';
 

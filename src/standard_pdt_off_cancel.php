@@ -17,7 +17,7 @@ echo PHP_EOL;
 # Array
 # (
 # )
-# 
+#
 # $_POST
 # Array
 # (
