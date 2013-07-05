@@ -1,5 +1,15 @@
 <?php
 
+# NOTE
+# Payment Data Transfer (PDT) does not work locally on host other than
+# localhost, e.g. I have *home* alias to 127.0.0.1 in /etc/hosts.
+#
+#	http://home/path/to/standard_pdt_on.php
+#	does not work
+#
+#	http://localhost/path/to/standard_pdt_on.php
+#	works
+
 # PayPal Payments Standard
 # https://www.paypal.com/webapps/mpp/paypal-payments-standard
 
@@ -20,109 +30,39 @@
 #    *return* script will receive the same parameters which
 #    *notify_url* will receive.
 
+# HTML Variables for PayPal Payments Standard
+# https://developer.paypal.com/webapps/developer/docs/classic/paypal-payments-standard/integration-guide/Appx_websitestandard_htmlvariables
+
 require 'config.php';
 require 'core.php';
 
-$order_id = 'ORDER-'.time();
-$order_title = 'Order #'.time();
-$order_description = 'Praesent dignissim lobortis erat vitae elementum. Ut hendrerit ullamcorper diam, quis laoreet risus adipiscing vitae.';
-$order_amount = 12.99;
-$order_currency = 'USD';
+$order = include 'order.php';
 
-$shipping = true; # enable/disable shipping
-$shipping_title = 'Flat Rate';
-$shipping_amount = 5.00;
-$shipping_currency = 'USD';
-
-# Generate a Random Name - Fake Name Generator
-# http://www.fakenamegenerator.com/gen-random-us-us.php
-$billing_first_name = 'Janet';
-$billing_last_name = 'Cruz';
-$billing_middle_name = 'James';
-$billing_country = 'United States';
-$billing_state = 'Illinois';
-$billing_city = 'Oak Brook';
-$billing_zip = '60523';
-$billing_address_1 = '2796 Steele Street';
-$billing_address_2 = '1st Flat';
-$billing_phone = '630-634-1799';
-$billing_email = 'vladimir.barbarosh@gmail.com';
-
-# Generate a Random Name - Fake Name Generator
-# http://www.fakenamegenerator.com/gen-random-us-us.php
-$shipping_first_name = 'Pete';
-$shipping_last_name = 'Russo';
-$shipping_middle_name = 'Klay';
-$shipping_country = 'United States';
-$shipping_state = 'Minnesota';
-$shipping_city = 'Baudette';
-$shipping_zip = '56623';
-$shipping_address_1 = '1028 Terra Cotta Street';
-$shipping_address_2 = '2nd Flat';
-$shipping_phone = '218-634-5672';
-$shipping_email = 'vladimir.barbarosh@gmail.com';
-
-# HTML Variables for PayPal Payments Standard
-# https://developer.paypal.com/webapps/developer/docs/classic/paypal-payments-standard/integration-guide/Appx_websitestandard_htmlvariables/
+# setup
 $param = array();
 $param['business'] = $config['business'];
 $param['cmd'] = '_xclick';
 
-# HTML Variables for Individual Items
-# https://developer.paypal.com/webapps/developer/docs/classic/paypal-payments-standard/integration-guide/Appx_websitestandard_htmlvariables/#id08A6HF080O3
-$param['item_name'] = $order_title;
-$param['amount'] = $order_amount;
-if ($shipping) {
-	$param['shipping'] = $shipping_amount;
+# order, billing, shipping, and tax
+$param = paypal_standard_add_order($param, $order);
+if (isset($order['billing'])) {
+	$param = paypal_standard_add_billing($param, $order);
+}
+if (isset($order['shipping'])) {
+	$param = paypal_standard_add_shipping($param, $order);
+}
+if (isset($order['tax'])) {
+	$param = paypal_standard_add_tax($param, $order);
 }
 
-# HTML Variables for Payment Transactions
-# https://developer.paypal.com/webapps/developer/docs/classic/paypal-payments-standard/integration-guide/Appx_websitestandard_htmlvariables/#id08A6HH00W2J
-$param['invoice'] = $order_id;
-$param['currency_code'] = $order_currency;
-if ($shipping) {
-	assert($order_currency == $shipping_currency);
-}
-
-# HTML Variables for Displaying PayPal Checkout Pages
-# https://developer.paypal.com/webapps/developer/docs/classic/paypal-payments-standard/integration-guide/Appx_websitestandard_htmlvariables/#id08A6HI0709B
-$param['no_note'] = 1;
-if (!$shipping) {
-	$param['no_shipping'] = 1;
-}
-
-# HTML Variables for Displaying PayPal Checkout Pages
-# https://developer.paypal.com/webapps/developer/docs/classic/paypal-payments-standard/integration-guide/Appx_websitestandard_htmlvariables/#id08A6HI0709B
+# endpoint
 $param['return'] = dirname(script_url()).'/standard_pdt_on_confirm.php';
 $param['cancel_return'] = dirname(script_url()).'/standard_pdt_on_cancel.php';
-# HTML Variables for PayPal Payments Standard
-# https://developer.paypal.com/webapps/developer/docs/classic/paypal-payments-standard/integration-guide/Appx_websitestandard_htmlvariables/
 $param['notify_url'] = dirname(script_url()).'/standard_ipn.php';
+$param['notify_url'] = 'http://requestb.in/xxxxxxxx';
 
-# HTML Variables for Filling Out PayPal Checkout Pages Automatically
-# https://developer.paypal.com/webapps/developer/docs/classic/paypal-payments-standard/integration-guide/Appx_websitestandard_htmlvariables/#id08A6HI0J0VU
-#
-# Pre-Populate Your Customer's PayPal Sign-Up
-# https://www.paypal.com/uk/cgi-bin/webscr?cmd=_pdn_xclick_prepopulate_outside
-if ($shipping) {
-	$param['address_override'] = 1;
-}
-else {
-	# Address will be used on the following tab:
-	#
-	#	Pay with a debit or credit card
-	#	(Optional) Join PayPal for faster future checkout
-}
-$param['first_name'] = $shipping_first_name;
-$param['last_name'] = $shipping_last_name;
-$param['country'] = @abbreviate_country($shipping_country);
-$param['state'] = @abbreviate_state($shipping_state);
-$param['city'] = $shipping_city;
-$param['zip'] = $shipping_zip;
-$param['address1'] = $shipping_address_1;
-$param['address2'] = $shipping_address_2;
-$param['night_phone_b'] = $shipping_phone; # TODO night_phone_a, night_phone_b, night_phone_c
-$param['email'] = $shipping_email;
+# etc.
+$param['no_note'] = 1;
 
 ?>
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN"

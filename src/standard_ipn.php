@@ -59,8 +59,8 @@ echo PHP_EOL;
 #     [address_country] => United States
 #     [address_city] => Baudette
 #     [quantity] => 1
-#     [payer_email] => xxxxxxxx@xxxxxxxxxx.com
 #     [verify_sign] => AFcWxV21C7fd0v3bYYYRCpSSRl31AyvnSuXScka8UM5LHyV-ALPyaIHd
+#     [payer_email] => xxxxxxxx@xxxxxxxxxx.com
 #     [txn_id] => 7VN89114KM9964042
 #     [payment_type] => instant
 #     [last_name] => Account
@@ -78,8 +78,7 @@ echo PHP_EOL;
 #     [transaction_subject] => Order #1372867010
 #     [payment_gross] => 20.10
 #     [shipping] => 5.00
-#     [merchant_return_link] => click here
-#     [auth] => AcnryuInjowiiqfTF96eOf-XlPmnZzMJTzRPWMr0Dv9qKDIImO3zIijQ4Fliq408WVmvezBMOu6kfLudyDdm6Iw
+#     [ipn_track_id] => fcad37c56950
 # )
 #
 # $order
@@ -158,8 +157,8 @@ echo PHP_EOL;
 #     [payer_status] => verified
 #     [business] => xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx@xxxxx.com
 #     [quantity] => 1
-#     [payer_email] => xxxxxxxx@xxxxxxxxxx.com
 #     [verify_sign] => An5ns1Kso7MWUdW4ErQKJJJ4qi4-ANMSH4.7KtdsL2UAm4IzgnhEpX9k
+#     [payer_email] => xxxxxxxx@xxxxxxxxxx.com
 #     [txn_id] => 12N22287J18419148
 #     [payment_type] => instant
 #     [last_name] => Account
@@ -176,9 +175,7 @@ echo PHP_EOL;
 #     [transaction_subject] => Order #1372867723
 #     [payment_gross] => 20.10
 #     [shipping] => 0.00
-#     [merchant_return_link] => click here
-#     [auth] => A1W3c7lEQXo0SHMf1uP5YQ2Zhg4K7-27pt.mgZciogLLGs6KzSu9ery8jyc5SYfvQimVs4xYA5.4S28jF.Rq9Qg
-#     [form_charset] => UTF-8
+#     [ipn_track_id] => 894890a9df131
 # )
 #
 # $order

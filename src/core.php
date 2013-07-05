@@ -25,6 +25,38 @@ function script_url()
 	return "$protocol://$server_name:$server_port$script_name";
 }
 
+# list($first, $last, $middle) = parse('Janet Cruz');
+# list($first, $last, $middle) = parse('Janet J. Cruz');
+function parse_name($name)
+{
+	# guessing
+	$part = explode(' ', $name);
+	switch (count($part)) {
+	case 1:
+		$ret = array();
+		$ret['first'] = null;
+		$ret['last'] = $part[0];
+		$ret['middle'] = null;
+		break;
+	case 2:
+		$ret = array();
+		$ret['first'] = $part[0];
+		$ret['last'] = $part[1];
+		$ret['middle']= null;
+		break;
+	default:
+		$ret = array();
+		$ret['first'] = $part[0];
+		$ret['last'] = $part[count($part)-1];
+		$ret['middle'] = implode(' ', array_slice($part, 1, -1));
+		break;
+	}
+	$ret[0] = $ret['first'];
+	$ret[1] = $ret['last'];
+	$ret[2] = $ret['middle'];
+	return $ret;
+}
+
 function validate_ipn($ipn, $config)
 {
 	$param = array_merge(array('cmd' => '_notify-validate'), $ipn);
@@ -52,310 +84,190 @@ function validate_ipn($ipn, $config)
 	return null;
 }
 
-# HTML Variables for Filling Out PayPal Checkout Pages Automatically
-# https://developer.paypal.com/webapps/developer/docs/classic/paypal-payments-standard/integration-guide/Appx_websitestandard_htmlvariables/#id08A6HI0J0VU
+# PayPal Payments Standard
 #
-#	Official USPS Abbreviations
-#	https://www.usps.com/ship/official-abbreviations.htm
-function abbreviate_state($state)
+# HTML Variables for PayPal Payments Standard
+# https://developer.paypal.com/webapps/developer/docs/classic/paypal-payments-standard/integration-guide/Appx_websitestandard_htmlvariables
+
+function paypal_standard_pdt_get($tx, $config)
 {
-	static $tab = array(
-		# State/Possession
-		'ALABAMA' => 'AL',
-		'ALASKA' => 'AK',
-		'AMERICAN SAMOA' => 'AS',
-		'ARIZONA' => 'AZ',
-		'ARKANSAS' => 'AR',
-		'CALIFORNIA' => 'CA',
-		'COLORADO' => 'CO',
-		'CONNECTICUT' => 'CT',
-		'DELAWARE' => 'DE',
-		'DISTRICT OF COLUMBIA' => 'DC',
-		'FEDERATED STATES OF MICRONESIA' => 'FM',
-		'FLORIDA' => 'FL',
-		'GEORGIA' => 'GA',
-		'GUAM GU' => 'GU',
-		'HAWAII' => 'HI',
-		'IDAHO' => 'ID',
-		'ILLINOIS' => 'IL',
-		'INDIANA' => 'IN',
-		'IOWA' => 'IA',
-		'KANSAS' => 'KS',
-		'KENTUCKY' => 'KY',
-		'LOUISIANA' => 'LA',
-		'MAINE' => 'ME',
-		'MARSHALL ISLANDS' => 'MH',
-		'MARYLAND' => 'MD',
-		'MASSACHUSETTS' => 'MA',
-		'MICHIGAN' => 'MI',
-		'MINNESOTA' => 'MN',
-		'MISSISSIPPI' => 'MS',
-		'MISSOURI' => 'MO',
-		'MONTANA' => 'MT',
-		'NEBRASKA' => 'NE',
-		'NEVADA' => 'NV',
-		'NEW HAMPSHIRE' => 'NH',
-		'NEW JERSEY' => 'NJ',
-		'NEW MEXICO' => 'NM',
-		'NEW YORK' => 'NY',
-		'NORTH CAROLINA' => 'NC',
-		'NORTH DAKOTA' => 'ND',
-		'NORTHERN MARIANA ISLANDS' => 'MP',
-		'OHIO' => 'OH',
-		'OKLAHOMA' => 'OK',
-		'OREGON' => 'OR',
-		'PALAU' => 'PW',
-		'PENNSYLVANIA' => 'PA',
-		'PUERTO RICO' => 'PR',
-		'RHODE ISLAND' => 'RI',
-		'SOUTH CAROLINA' => 'SC',
-		'SOUTH DAKOTA' => 'SD',
-		'TENNESSEE' => 'TN',
-		'TEXAS' => 'TX',
-		'UTAH' => 'UT',
-		'VERMONT' => 'VT',
-		'VIRGIN ISLANDS' => 'VI',
-		'VIRGINIA' => 'VA',
-		'WASHINGTON' => 'WA',
-		'WEST VIRGINIA' => 'WV',
-		'WISCONSIN' => 'WI',
-		'WYOMING' => 'WY',
-		# Military "State"
-		'ARMED FORCES AFRICA' => 'AE',
-		'ARMED FORCES AMERICAS' => 'AA',
-		'ARMED FORCES CANADA' => 'AE',
-		'ARMED FORCES EUROPE' => 'AE',
-		'ARMED FORCES MIDDLE EAST' => 'AE',
-		'ARMED FORCES PACIFIC' => 'AP',
-	);
-	$up = strtoupper($state);
-	if (in_array($up, $tab)) {
-		return $up;
+	$param = array();
+	$param['cmd'] = '_notify-synch';
+	$param['tx'] = $tx;
+	$param['at'] = $config['pdt_token'];
+
+	$curl = curl_init();
+	curl_setopt($curl, CURLOPT_URL, $config['www_endpoint']);
+	curl_setopt($curl, CURLOPT_POST, true);
+	curl_setopt($curl, CURLOPT_POSTFIELDS, http_build_query($param));
+	curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
+	$response = curl_exec($curl);
+	$errno = curl_errno($curl);
+	$code = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+	curl_close($curl);
+
+	if ($errno != 0) {
+		$param = null;
+		$error = 'ECURL';
+		return array($param, $error);
 	}
-	if (!isset($tab[$up])) {
-		trigger_error('Invalid state: '.$state, E_USER_WARNING);
-		return null;
+
+	if ($code != 200) {
+		$param = null;
+		$error = 'EPAYPAL';
+		return array($param, $error);
 	}
-	return $tab[$up];
+
+	$param_array = explode("\n", $response);
+	if ($param_array[0] != 'SUCCESS') {
+		$param = null;
+		$error = $param_array[0];
+		return array($param, $error);
+	}
+
+	parse_str(implode('&', array_slice($param_array, 1)), $param);
+	$error = null;
+	return array($param, $error);
 }
 
-# HTML Variables for Filling Out PayPal Checkout Pages Automatically
-# https://developer.paypal.com/webapps/developer/docs/classic/paypal-payments-standard/integration-guide/Appx_websitestandard_htmlvariables/#id08A6HI0J0VU
-#
-#	Countries and Regions Supported by PayPal
-#	https://developer.paypal.com/webapps/developer/docs/classic/api/country_codes/
-function abbreviate_country($country)
+function paypal_standard_parse($param)
 {
-	static $tab = array(
-		'ALAND ISLANDS' => 'AX',
-		'ALBANIA' => 'AL',
-		'ALGERIA' => 'DZ',
-		'AMERICAN SAMOA' => 'AS',
-		'ANDORRA' => 'AD',
-		'ANGUILLA' => 'AI',
-		'ANTARCTICA' => 'AQ',
-		'ANTIGUA AND BARBUDA' => 'AG',
-		'ARGENTINA' => 'AR',
-		'ARMENIA' => 'AM',
-		'ARUBA' => 'AW',
-		'AUSTRALIA' => 'AU',
-		'AUSTRIA' => 'AT',
-		'AZERBAIJAN' => 'AZ',
-		'BAHAMAS' => 'BS',
-		'BAHRAIN' => 'BH',
-		'BANGLADESH' => 'BD',
-		'BARBADOS' => 'BB',
-		'BELGIUM' => 'BE',
-		'BELIZE' => 'BZ',
-		'BENIN' => 'BJ',
-		'BERMUDA' => 'BM',
-		'BHUTAN' => 'BT',
-		'BOSNIA-HERZEGOVINA' => 'BA',
-		'BOTSWANA' => 'BW',
-		'BOUVET ISLAND' => 'BV',
-		'BRAZIL' => 'BR',
-		'BRITISH INDIAN OCEAN TERRITORY' => 'IO',
-		'BRUNEI DARUSSALAM' => 'BN',
-		'BULGARIA' => 'BG',
-		'BURKINA FASO' => 'BF',
-		'CANADA' => 'CA',
-		'CAPE VERDE' => 'CV',
-		'CAYMAN ISLANDS' => 'KY',
-		'CENTRAL AFRICAN REPUBLIC' => 'CF',
-		'CHILE' => 'CL',
-		'CHINA' => 'CN', # CN (For domestic Chinese bank transactions only); C2 (For CUP, bank card and cross-border transactions)
-		'CHRISTMAS ISLAND' => 'CX',
-		'COCOS (KEELING) ISLANDS' => 'CC',
-		'COLOMBIA' => 'CO',
-		'COOK ISLANDS' => 'CK',
-		'COSTA RICA' => 'CR',
-		'CYPRUS' => 'CY',
-		'CZECH REPUBLIC' => 'CZ',
-		'DENMARK' => 'DK',
-		'DJIBOUTI' => 'DJ',
-		'DOMINICA' => 'DM',
-		'DOMINICAN REPUBLIC' => 'DO',
-		'ECUADOR' => 'EC',
-		'EGYPT' => 'EG',
-		'EL SALVADOR' => 'SV',
-		'ESTONIA' => 'EE',
-		'FALKLAND ISLANDS (MALVINAS)' => 'FK',
-		'FAROE ISLANDS' => 'FO',
-		'FIJI' => 'FJ',
-		'FINLAND' => 'FI',
-		'FRANCE' => 'FR',
-		'FRENCH GUIANA' => 'GF',
-		'FRENCH POLYNESIA' => 'PF',
-		'FRENCH SOUTHERN TERRITORIES' => 'TF',
-		'GABON' => 'GA',
-		'GAMBIA' => 'GM',
-		'GEORGIA' => 'GE',
-		'GERMANY' => 'DE',
-		'GHANA' => 'GH',
-		'GIBRALTAR' => 'GI',
-		'GREECE' => 'GR',
-		'GREENLAND' => 'GL',
-		'GRENADA' => 'GD',
-		'GUADELOUPE' => 'GP',
-		'GUAM' => 'GU',
-		'GUERNSEY' => 'GG',
-		'GUYANA' => 'GY',
-		'HEARD ISLAND AND MCDONALD ISLANDS' => 'HM',
-		'HOLY SEE (VATICAN CITY STATE)' => 'VA',
-		'HONDURAS' => 'HN',
-		'HONG KONG' => 'HK',
-		'HUNGARY' => 'HU',
-		'ICELAND' => 'IS',
-		'INDIA' => 'IN',
-		'INDONESIA' => 'ID',
-		'IRELAND' => 'IE',
-		'ISLE OF MAN' => 'IM',
-		'ISRAEL' => 'IL',
-		'ITALY' => 'IT',
-		'JAMAICA' => 'JM',
-		'JAPAN' => 'JP',
-		'JERSEY' => 'JE',
-		'JORDAN' => 'JO',
-		'KAZAKHSTAN' => 'KZ',
-		'KIRIBATI' => 'KI',
-		'KOREA, REPUBLIC OF' => 'KR',
-		'KUWAIT' => 'KW',
-		'KYRGYZSTAN' => 'KG',
-		'LATVIA' => 'LV',
-		'LESOTHO' => 'LS',
-		'LIECHTENSTEIN' => 'LI',
-		'LITHUANIA' => 'LT',
-		'LUXEMBOURG' => 'LU',
-		'MACAO' => 'MO',
-		'MACEDONIA' => 'MK',
-		'MADAGASCAR' => 'MG',
-		'MALAWI' => 'MW',
-		'MALAYSIA' => 'MY',
-		'MALTA' => 'MT',
-		'MARSHALL ISLANDS' => 'MH',
-		'MARTINIQUE' => 'MQ',
-		'MAURITANIA' => 'MR',
-		'MAURITIUS' => 'MU',
-		'MAYOTTE' => 'YT',
-		'MEXICO' => 'MX',
-		'MICRONESIA, FEDERATED STATES OF' => 'FM',
-		'MOLDOVA, REPUBLIC OF' => 'MD',
-		'MONACO' => 'MC',
-		'MONGOLIA' => 'MN',
-		'MONTENEGRO' => 'ME',
-		'MONTSERRAT' => 'MS',
-		'MOROCCO' => 'MA',
-		'MOZAMBIQUE' => 'MZ',
-		'NAMIBIA' => 'NA',
-		'NAURU' => 'NR',
-		'NEPAL' => 'NP',
-		'NETHERLANDS' => 'NL',
-		'NETHERLANDS ANTILLES' => 'AN',
-		'NEW CALEDONIA' => 'NC',
-		'NEW ZEALAND' => 'NZ',
-		'NICARAGUA' => 'NI',
-		'NIGER' => 'NE',
-		'NIUE' => 'NU',
-		'NORFOLK ISLAND' => 'NF',
-		'NORTHERN MARIANA ISLANDS' => 'MP',
-		'NORWAY' => 'NO',
-		'OMAN' => 'OM',
-		'PALAU' => 'PW',
-		'PALESTINE' => 'PS',
-		'PANAMA' => 'PA',
-		'PARAGUAY' => 'PY',
-		'PERU' => 'PE',
-		'PHILIPPINES' => 'PH',
-		'PITCAIRN' => 'PN',
-		'POLAND' => 'PL',
-		'PORTUGAL' => 'PT',
-		'PUERTO RICO' => 'PR',
-		'QATAR' => 'QA',
-		'REUNION' => 'RE',
-		'ROMANIA' => 'RO',
-		'REPUBLIC OF SERBIA' => 'RS',
-		'RUSSIAN FEDERATION' => 'RU',
-		'RWANDA' => 'RW',
-		'SAINT HELENA' => 'SH',
-		'SAINT KITTS AND NEVIS' => 'KN',
-		'SAINT LUCIA' => 'LC',
-		'SAINT PIERRE AND MIQUELON' => 'PM',
-		'SAINT VINCENT AND THE GRENADINES' => 'VC',
-		'SAMOA' => 'WS',
-		'SAN MARINO' => 'SM',
-		'SAO TOME AND PRINCIPE' => 'ST',
-		'SAUDI ARABIA' => 'SA',
-		'SENEGAL' => 'SN',
-		'SEYCHELLES' => 'SC',
-		'SINGAPORE' => 'SG',
-		'SLOVAKIA' => 'SK',
-		'SLOVENIA' => 'SI',
-		'SOLOMON ISLANDS' => 'SB',
-		'SOUTH AFRICA' => 'ZA',
-		'SOUTH GEORGIA AND THE SOUTH SANDWICH ISLANDS' => 'GS',
-		'SPAIN' => 'ES',
-		'SURINAME' => 'SR',
-		'SVALBARD AND JAN MAYEN' => 'SJ',
-		'SWAZILAND' => 'SZ',
-		'SWEDEN' => 'SE',
-		'SWITZERLAND' => 'CH',
-		'TAIWAN, PROVINCE OF CHINA' => 'TW',
-		'TANZANIA, UNITED REPUBLIC OF' => 'TZ',
-		'THAILAND' => 'TH',
-		'TIMOR-LESTE' => 'TL',
-		'TOGO' => 'TG',
-		'TOKELAU' => 'TK',
-		'TONGA' => 'TO',
-		'TRINIDAD AND TOBAGO' => 'TT',
-		'TUNISIA' => 'TN',
-		'TURKEY' => 'TR',
-		'TURKMENISTAN' => 'TM',
-		'TURKS AND CAICOS ISLANDS' => 'TC',
-		'TUVALU' => 'TV',
-		'UGANDA' => 'UG',
-		'UKRAINE' => 'UA',
-		'UNITED ARAB EMIRATES' => 'AE',
-		'UNITED KINGDOM' => 'GB',
-		'UNITED STATES' => 'US',
-		'UNITED STATES MINOR OUTLYING ISLANDS' => 'UM',
-		'URUGUAY' => 'UY',
-		'UZBEKISTAN' => 'UZ',
-		'VANUATU' => 'VU',
-		'VENEZUELA' => 'VE',
-		'VIET NAM' => 'VN',
-		'VIRGIN ISLANDS, BRITISH' => 'VG',
-		'VIRGIN ISLANDS, U.S.' => 'VI',
-		'WALLIS AND FUTUNA' => 'WF',
-		'WESTERN SAHARA' => 'EH',
-		'ZAMBIA' => 'ZM',
+	$order = paypal_standard_parse_order($param);
+	$billing = paypal_standard_parse_billing($param);
+	if (isset($billing)) {
+		$order['billing'] = $billing;
+		unset($billing);
+	}
+	$shipping = paypal_standard_parse_shipping($param);
+	if (isset($shipping)) {
+		$order['shipping'] = $shipping;
+		unset($shipping);
+	}
+	$tax = paypal_standard_parse_tax($param);
+	if (isset($tax)) {
+		$order['tax'] = $tax;
+		unset($tax);
+	}
+	return $order;
+}
+
+function paypal_standard_add_order($param, $order)
+{
+	$param['item_number'] = $order['id'];
+	$param['item_name'] = $order['title'];
+	$param['amount'] = $order['amount'];
+	$param['currency_code'] = $order['currency'];
+	$param['no_shipping'] = 1;
+	return $param;
+}
+
+function paypal_standard_parse_order($param)
+{
+	return array(
+		'id' => $param['item_number'],
+		'title' => $param['item_name'],
+		'description' => null,
+		'amount' => $param['mc_gross'],
+		'currency' => $param['mc_currency'],
 	);
-	$up = strtoupper($country);
-	if (in_array($up, $tab)) {
-		return $up;
+}
+
+function paypal_standard_add_billing($param, $order)
+{
+	# PayPal Payments Standard does not have billing
+	return $param;
+}
+
+function paypal_standard_parse_billing($param)
+{
+	return array(
+		'first_name' => $param['first_name'],
+		'last_name' => $param['last_name'],
+		'country_code' => null,
+		'state_code' => null,
+		'province' => null,
+		'city' => null,
+		'zip_code' => null,
+		'address' => null,
+		'address2' => null,
+		'company' => null,
+		'phone' => null,
+		'email' => $param['payer_email'],
+	);
+}
+
+function paypal_standard_add_shipping($param, $order)
+{
+	if (!isset($param['amount'])) {
+		trigger_error('paypal_standard_add_order() was not called', E_USER_ERROR);
 	}
-	if (!isset($tab[$up])) {
-		trigger_error('Invalid country: '.$state, E_USER_WARNING);
-		return null;
+
+	$param['amount'] -= $order['shipping']['amount'];
+	$param['shipping'] = $order['shipping']['amount'];
+	$param['address_override'] = 1;
+	unset($param['no_shipping']);
+
+	# Address will be used on the following tab:
+	#
+	#	Pay with a debit or credit card
+	#	(Optional) Join PayPal for faster future checkout
+	#
+	$param['first_name'] = $order['shipping']['first_name'];
+	$param['last_name'] = $order['shipping']['last_name'];
+	$param['country'] = $order['shipping']['country_code'];
+	if (empty($order['shipping']['state_code'])) {
+		$param['state'] = $order['shipping']['province'];
 	}
-	return $tab[$up];
+	else {
+		$param['state'] = $order['shipping']['state_code'];
+	}
+	$param['city'] = $order['shipping']['city'];
+	$param['zip'] = $order['shipping']['zip_code'];
+	$param['address1'] = $order['shipping']['address'];
+	$param['address2'] = $order['shipping']['address2'];
+	$param['night_phone_b'] = $order['shipping']['phone'];
+	$param['email'] = $order['shipping']['email'];
+
+	return $param;
+}
+
+function paypal_standard_parse_shipping($param)
+{
+	if (isset($param['address_country_code'])) {
+		$shipping = array();
+		$shipping['title'] = null;
+		$shipping['amount'] = $param['shipping'];
+		list($shipping['first_name'], $shipping['last_name']) = parse_name($param['address_name']);
+		$shipping['country_code'] = $param['address_country_code'];
+		$shipping['state_code'] = $param['address_state'];
+		$shipping['province'] = null;
+		$shipping['city'] = $param['address_city'];
+		$shipping['zip_code'] = $param['address_zip'];
+		list($shipping['address'], $shipping['address2']) = explode("\n", $param['address_street']."\n");
+		$shipping['address'] = trim($shipping['address']);
+		$shipping['address2'] = trim($shipping['address2']);
+		$shipping['company'] = null;
+		$shipping['phone'] = null;
+		$shipping['email'] = $param['payer_email'];
+		return $shipping;
+	}
+	return null;
+}
+
+function paypal_standard_add_tax($param, $order)
+{
+	if (!isset($param['amount'])) {
+		trigger_error('paypal_standard_add_order() was not called', E_USER_ERROR);
+	}
+	$param['amount'] -= $order['tax']['amount'];
+	$param['tax'] = $order['tax']['amount'];
+	return $param;
+}
+
+function paypal_standard_parse_tax($param)
+{
+	if (isset($param['tax'])) {
+		return array('amount' => $param['tax']);
+	}
+	return null;
 }
